@@ -1,4 +1,4 @@
-const {asyncMap} = require("../src/index");
+const {asyncMap, promiseMap} = require("../src/index");
 
 describe("asyncMap", () => {
     test("Асинхронне множення", (done) => {
@@ -7,7 +7,7 @@ describe("asyncMap", () => {
             (item,callback) => {
                 setTimeout(() => {
                     callback(null, item*2);
-                }, 1000)
+                }, 200)
             },
             (err,results) => {
                 expect(err).toBeNull();
@@ -26,7 +26,7 @@ describe("asyncMap", () => {
                 }
                 setTimeout(() => {
                     callback(null, item*2);
-                }, 1000)
+                }, 200)
             },
             (err,results) => {
                 expect(err).toBeInstanceOf(Error);
@@ -44,7 +44,7 @@ describe("asyncMap", () => {
             (item,callback) => {
                 setTimeout(() => {
                     callback(null, item*2);
-                }, 1000)
+                }, 200)
             },
             (err,results) => {
                 const elapsed = new Date() - start;
@@ -56,7 +56,42 @@ describe("asyncMap", () => {
     });
 });
 
-
+describe("promiseMap", () => {
+    test("Асинхронне множення", async () => {
+        const results = await promiseMap(
+            [2,4,6],
+            (item) => new Promise((resolve) => {
+                setTimeout(() => resolve(item*2), 200)
+            }));
+            expect(results).toEqual([4,8,12]);
+    });
+    
+    test("Обробка помилок", async () => {
+        await expect(
+            promiseMap([2,4,6], async (item) => {
+               if (item === 4) {
+                    throw new Error("Помилка");
+                } 
+                return item*2;
+            })
+        ).rejects.toThrow("Помилка")
+    });
+    
+    
+    test("Пiдтримка паралелiзму", async () => {
+        const start = new Date();
+        
+        const results = await promiseMap(
+            [2,3,4,5,6],
+            (item) => new Promise((resolve) => {
+                setTimeout(() => resolve(item*2), 1000)
+            }), 2);
+            const elapsed = new Date() - start;
+            expect(results).toEqual([4,6,8,10,12]);
+            expect(elapsed).toBeGreaterThanOrEqual(3000);
+    });
+    
+});
 
 
 
