@@ -32,13 +32,17 @@ const asyncMap = async (array, asyncCallback, onComplete, debounceTime = 0) => {
  * @param {Array} array - масив даних.
  * @param {Function} asyncCallback - асинхронна функція (елемент) => Promise.
  * @param {number} concurrency - кількість паралельних операцій (за замовчуванням Infinity).
+ * @param {AbortSignal} signal - об'єкт сигналу для відміни.
  * @returns {Promise<Array>} Promise з результатами.
  */
-const promiseMap = async (array, asyncCallback, concurrensy = Infinity) => {
+const promiseMap = async (array, asyncCallback, concurrensy = Infinity, signal = null) => {
     const results = [];
     const executing = new Set();
+    if (signal?.aborted) {
+        throw new Error("Операцiя була вiдмiнена до початку")
+    }
     for (const item of array) {
-        const promise = asyncCallback(item)
+        const promise = asyncCallback(item, signal)
         .then((result) => {
             results.push(result);
             executing.delete(promise);
@@ -46,6 +50,9 @@ const promiseMap = async (array, asyncCallback, concurrensy = Infinity) => {
         .catch((error) => {
             executing.delete(promise);
             throw error;
+        })
+        .finally(() => {
+            executing.delete(promise);
         });
         executing.add(promise);
         if (executing.size >= concurrensy) {

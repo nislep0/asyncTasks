@@ -83,6 +83,30 @@ const demoConcurencyPromiseMap = async () => {
     console.log("Час виконання: ", new Date() - start, "ms");
 };
 
+const demoAbort = async () => {
+    const controller = new AbortController();
+    const {signal} = controller;
+    setTimeout(() => controller.abort(),1500);
+    try {
+        const results = await promiseMap(
+            [1,2,3,4,5,6],
+            (item, signal) =>
+                new Promise((resolve,reject) => {
+                    const timeout = setTimeout(() => resolve(item*2),1000);
+                    signal?.addEventListener("abort", () => {
+                        clearTimeout(timeout);
+                        reject(new Error("Операцiя вiдмiнена"));
+                    });    
+                }),
+            2,
+            signal
+        );
+        console.log("Результати (AbortController): ", results);
+    } catch (err) {
+        console.error("Помилка (AbortController)", err);
+    }
+};
+
 demoAsyncMap();
 demoErrorHandlingAsyncMap();
 
@@ -90,5 +114,6 @@ demoErrorHandlingAsyncMap();
     await demoPromiseMap();
     await demoErrorHandlingPromiseMap();
     await demoConcurencyPromiseMap();
+    await demoAbort();
 })();
 

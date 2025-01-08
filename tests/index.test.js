@@ -94,7 +94,42 @@ describe("promiseMap", () => {
 });
 
 
-
+describe("promiseMap з пiдтримкою AbortController", () => {
+    test("Вiдмiна операції до її завершення", async () => {
+        const controller = new AbortController();
+        const {signal} = controller;
+        setTimeout(() => controller.abort(),1500);
+        await expect(
+            promiseMap(
+                [1,2,3,4,5,6],
+                (item,signal) => 
+                new Promise((resolve,reject) => {
+                    const timeout = setTimeout(() => resolve(item*2),1000);
+                    signal?.addEventListener("abort", () => {
+                        clearTimeout(timeout);
+                        reject(new Error("Операцiя вiдмiнена"));
+                    });
+                }),
+                2,
+                signal
+            )
+        ).rejects.toThrow("Операцiя вiдмiнена");
+    });
+    
+    test("Успiшне виконання без вiдмiни", async () => {
+        const controller = new AbortController();
+        const {signal} = controller;
+        const results = await promiseMap(
+            [2,4,6],
+            (item,signal) => new Promise((resolve) => {
+                setTimeout(() => resolve(item*2), 200)
+            }),
+            2,
+            signal
+        );
+        expect(results).toEqual([4,8,12]);
+    });
+});
 
 
 
