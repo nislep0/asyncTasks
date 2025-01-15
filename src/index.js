@@ -7,31 +7,36 @@
  * @param {number} debounceTime - затримка виконання, мс (за замовчуванням 0).
  */
 const asyncMap = async (array, asyncCallback, onComplete, debounceTime = 0) => {
-	try {
-		const results = [];
-		for (const item of array) {
-		    const startTime = new Date();
-		    const result = await new Promise((resolve,reject) => 
-		    asyncCallback(item, (err,res) => (err ? reject(err): resolve(res))));
-		    const elapsed = new Date() - startTime;
-		    const delay = Math.max(0, debounceTime - elapsed);
-		    if (delay > 0) {
-		        await new Promise((resolve) => setTimeout(resolve,delay));
-		    } 
-		    results.push(result);
-		}
-		onComplete(null,results);
-	} catch (e) {
-	    onComplete(e,null);
-	}
-};  
+    const results = [];
+    let index = 0;
+    const procesNext = () => {
+        if (index >= array.length) {
+            return onComplete(null,results);
+        }
+        const item = array[index];
+        const startTime = new Date();
+        asyncCallback(item, (err,res) => {
+            if (err) {
+                return onComplete(err,null);
+            }
+            const elapsed = new Date() - startTime;
+            const delay = debounceTime ? Math.max(0, debounceTime - elapsed) : 0;
+            setTimeout(() => {
+                results.push(res);
+                index++;
+                procesNext();
+            }, delay);
+        } );
+    };
+    procesNext();
+};    
 
 /**
  * Task 2
  * Асинхронна функція для роботи з масивами з використанням Promise.
  * @param {Array} array - масив даних.
  * @param {Function} asyncCallback - асинхронна функція (елемент) => Promise.
- * @param {number} concurrency - кількість паралельних операцій (за замовчуванням Infinity).
+ * @param {number} concurrensy - кількість паралельних операцій (за замовчуванням Infinity).
  * @param {AbortSignal} signal - об'єкт сигналу для відміни.
  * @returns {Promise<Array>} Promise з результатами.
  */
@@ -41,21 +46,18 @@ const promiseMap = async (array, asyncCallback, concurrensy = Infinity, signal =
     if (signal?.aborted) {
         throw new Error("Операцiя була вiдмiнена до початку")
     }
-    for (const item of array) {
-        const promise = asyncCallback(item, signal)
-        .then((result) => {
-            results.push(result);
-            executing.delete(promise);
-        })
-        .catch((error) => {
-            executing.delete(promise);
-            throw error;
-        })
-        .finally(() => {
+    const procesItem = async (item,index) => {
+        if (signal?.aborted) {
+            throw new Error("Операцiя була вiдмiнена");
+        }  
+        results[index] = await asyncCallback(item,signal);
+    };
+    for (let i=0;i<array.length;i++) {
+        const promise = procesItem(array[i],i).finally(() => {
             executing.delete(promise);
         });
         executing.add(promise);
-        if (executing.size >= concurrensy) {
+        if (executing.size>=concurrensy) {
             await Promise.race(executing);
         }
     }
